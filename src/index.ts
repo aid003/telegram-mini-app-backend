@@ -20,7 +20,12 @@ const app = express();
 
 async function main() {
   app.use(express.json());
-  app.use(cors({ origin: "*" }));
+  app.use(
+    cors({
+      origin: "*",
+      methods: ["POST", "GET"],
+    })
+  );
   app.use(express.urlencoded({ extended: true }));
 
   app.use("/api/user-controller/", userController);

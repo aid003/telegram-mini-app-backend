@@ -12,7 +12,7 @@ type BotConfig = {
 
 const config: BotConfig = {
   token: process.env.API_KEY_BOT as string,
-  miniAppUrl: "https://127.0.0.1:3000",
+  miniAppUrl: `${process.env.MINI_APP_URL}`,
   welcomeImagePath: path.resolve("./public/main.jpg"),
 };
 

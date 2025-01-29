@@ -12,7 +12,7 @@ const log4js_1 = __importDefault(require("log4js"));
 const path_1 = __importDefault(require("path"));
 const config = {
     token: process.env.API_KEY_BOT,
-    miniAppUrl: "https://127.0.0.1:3000",
+    miniAppUrl: `${process.env.MINI_APP_URL}`,
     welcomeImagePath: path_1.default.resolve("./public/main.jpg"),
 };
 exports.bot = new node_telegram_bot_api_1.default(config.token, {

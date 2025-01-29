@@ -51,7 +51,7 @@ export const updateUserStatistics = expressAsyncHandler(
         const newUserStats = await prisma.userStatistics.create({
           data: {
             userId,
-            [stage]: value,
+            [stage]: Boolean(value),
           },
         });
 
@@ -68,7 +68,7 @@ export const updateUserStatistics = expressAsyncHandler(
       const updatedStats = await prisma.userStatistics.update({
         where: { userId },
         data: {
-          [stage]: value,
+          [stage]: Boolean(value),
         },
       });
 

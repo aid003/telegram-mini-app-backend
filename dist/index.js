@@ -20,7 +20,10 @@ logger.level = "info";
 const app = (0, express_1.default)();
 async function main() {
     app.use(express_1.default.json());
-    app.use((0, cors_1.default)({ origin: "*" }));
+    app.use((0, cors_1.default)({
+        origin: "*",
+        methods: ["POST", "GET"],
+    }));
     app.use(express_1.default.urlencoded({ extended: true }));
     app.use("/api/user-controller/", userController_1.userController);
     app.use("/api/update-user-statictics/", statisticController_1.updateUserStatistics);

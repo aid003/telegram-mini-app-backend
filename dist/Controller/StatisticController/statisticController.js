@@ -38,7 +38,7 @@ exports.updateUserStatistics = (0, express_async_handler_1.default)(async (req, 
             const newUserStats = await prisma.userStatistics.create({
                 data: {
                     userId,
-                    [stage]: value,
+                    [stage]: Boolean(value),
                 },
             });
             logger.info(`User statistics created successfully for userId: ${userId}`);
@@ -51,7 +51,7 @@ exports.updateUserStatistics = (0, express_async_handler_1.default)(async (req, 
         const updatedStats = await prisma.userStatistics.update({
             where: { userId },
             data: {
-                [stage]: value,
+                [stage]: Boolean(value),
             },
         });
         logger.info(`User statistics updated successfully for userId: ${userId}`);
