@@ -4,8 +4,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node .",
-    "prestart": "npm run build",
+    "start": "node dist/index.js",
+    "prestart": "pnpm run build",
     "server": "ts-node-dev --respawn --transpile-only src/index.ts"
   },
   "author": "",
@@ -45,6 +45,7 @@
     "nodemon": "^3.1.9",
     "reflect-metadata": "^0.2.2",
     "routing-controllers": "^0.10.4",
-    "sha256": "^0.2.0"
+    "sha256": "^0.2.0",
+    "uuid": "^11.0.5"
   }
 }
