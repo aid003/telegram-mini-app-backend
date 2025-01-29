@@ -18,6 +18,11 @@ exports.generatePaymentProcess = (0, express_async_handler_1.default)(async (req
         res.status(400).json({ message: "Missing required parameters" });
         return;
     }
+    if (!Number.isInteger(amount)) {
+        logger.warn(`Invalid amount: ${amount} is not an integer`);
+        res.status(400).json({ message: "Amount must be an integer" });
+        return;
+    }
     try {
         const user = await prisma.user.findUnique({
             where: { id },
@@ -41,7 +46,7 @@ exports.generatePaymentProcess = (0, express_async_handler_1.default)(async (req
             data: {
                 userId: id,
                 order_id: orderId,
-                amount: amount,
+                amount: Math.floor(amount),
             },
         });
         const paymentLink = await createPaymentLink(createPayment.order_id, createPayment.amount);

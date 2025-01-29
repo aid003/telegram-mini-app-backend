@@ -15,25 +15,42 @@ model User {
   createdAt  DateTime @default(now())
   payments   Payment[]   
   statistics UserStatistics? @relation(name: "UserToUserStatistics") 
+  applications Application[]
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
 }
 
 model Payment {
-  id        Int      @id @default(autoincrement())
-  order_id  String   @unique
-  amount    Int
-  status    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
+  id          Int      @id @default(autoincrement())
+  order_id    String   @unique
+  amount      Int
+  status      String   @default("PENDING") // "PENDING", "SUCCESS", "FAILED"
+  createdAt   DateTime @default(now())
+  processedAt DateTime? // Новый столбец, предотвращающий повторную обработку
+  user        User     @relation(fields: [userId], references: [id])
+  userId      Int
 }
+
 
 model UserStatistics {
   id                       Int     @id @default(autoincrement())
-  botLaunch                Boolean @default(false)  // Запуск бота
-  miniAppLinkClicked       Boolean @default(false)  // Переход по ссылке из бота в MINI App
-  learnMoreButtonClicked   Boolean @default(false)  // Человек нажал кнопку "Узнать больше"
-  courseButtonClicked      Boolean @default(false)  // Человек нажал кнопку "Купить курс"
-  coursePaid               Boolean @default(false)  // Человек оплатил курс
+  botLaunch                Boolean @default(false)  
+  miniAppLinkClicked       Boolean @default(false)  
+  learnMoreButtonClicked   Boolean @default(false)  
+  courseButtonClicked      Boolean @default(false)  
+  coursePaid               Boolean @default(false)  
   userId                   Int     @unique  
   user                     User    @relation(name: "UserToUserStatistics", fields: [userId], references: [id])
+}
+
+model Application {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  status    String   @default("pending") // "pending", "approved", "rejected"
+  createdAt DateTime @default(now())
 }

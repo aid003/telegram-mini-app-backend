@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.bot = void 0;
 exports.startTelegramBot = startTelegramBot;
 const caption_1 = require("./caption");
 const client_1 = require("@prisma/client");
@@ -14,13 +15,15 @@ const config = {
     miniAppUrl: "https://127.0.0.1:3000",
     welcomeImagePath: path_1.default.resolve("./public/main.jpg"),
 };
-const bot = new node_telegram_bot_api_1.default(config.token, { polling: { interval: 200 } });
+exports.bot = new node_telegram_bot_api_1.default(config.token, {
+    polling: { interval: 200 },
+});
 const prisma = new client_1.PrismaClient();
 const logger = log4js_1.default.getLogger();
 logger.level = "info";
 async function startTelegramBot() {
-    bot.on("polling_error", (err) => logger.error("Polling error:", err));
-    bot.on("message", async (msg) => {
+    exports.bot.on("polling_error", (err) => logger.error("Polling error:", err));
+    exports.bot.on("message", async (msg) => {
         if (msg.text !== "/start")
             return;
         const chatId = msg.chat.id;
@@ -29,7 +32,7 @@ async function startTelegramBot() {
         const firstName = msg.from?.first_name;
         if (!tgId || !userName || !firstName) {
             logger.warn(`Missing user data for chatId: ${chatId}`);
-            return bot.sendMessage(chatId, "Ошибка получения данных пользователя.");
+            return exports.bot.sendMessage(chatId, "Ошибка получения данных пользователя.");
         }
         try {
             let user = await prisma.user.findUnique({ where: { tgId } });
@@ -47,7 +50,7 @@ async function startTelegramBot() {
                 update: { botLaunch: true },
                 create: { userId: user.id, botLaunch: true },
             });
-            await bot.sendPhoto(chatId, config.welcomeImagePath, {
+            await exports.bot.sendPhoto(chatId, config.welcomeImagePath, {
                 caption: caption_1.caption,
                 parse_mode: "Markdown",
                 reply_markup: {
@@ -65,17 +68,17 @@ async function startTelegramBot() {
         }
         catch (error) {
             logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
-            await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
+            await exports.bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
         }
     });
-    bot.on("message", async (msg) => {
+    exports.bot.on("message", async (msg) => {
         if (msg.text !== "/statistic")
             return;
         const chatId = msg.chat.id;
         const tgId = msg.from?.id;
         const allowedTgIds = [2099914999, 7311013323];
         if (!allowedTgIds.includes(Number(tgId))) {
-            return bot.sendMessage(chatId, "У вас нет доступа к этой команде.");
+            return exports.bot.sendMessage(chatId, "У вас нет доступа к этой команде.");
         }
         try {
             const botLaunchCount = await prisma.userStatistics.count({
@@ -109,14 +112,14 @@ async function startTelegramBot() {
                 `Нажали кнопку "Узнать больше": ${learnMoreButtonClickedCount}\n` +
                 `Нажали кнопку "Купить курс": ${courseButtonClickedCount}\n` +
                 `Оплатили курс: ${coursePaidCount}`;
-            await bot.sendMessage(chatId, statisticsMessage, {
+            await exports.bot.sendMessage(chatId, statisticsMessage, {
                 parse_mode: "Markdown",
             });
             logger.info(`Статистика отправлена пользователю с tgId: ${tgId}`);
         }
         catch (error) {
             logger.error(`Ошибка при обработке команды /statistic у ${tgId}:`, error);
-            await bot.sendMessage(chatId, "Произошла ошибка при получении статистики. Попробуйте снова.");
+            await exports.bot.sendMessage(chatId, "Произошла ошибка при получении статистики. Попробуйте снова.");
         }
     });
 }

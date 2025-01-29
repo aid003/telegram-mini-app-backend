@@ -1,44 +1,57 @@
-import { PrismaClient } from "@prisma/client";
-import TelegramBot from "node-telegram-bot-api";
+import { bot } from "./../Telegram/bot";
+import { PrismaClient, Prisma } from "@prisma/client";
 import expressAsyncHandler from "express-async-handler";
 import log4js from "log4js";
 import { Request, Response } from "express";
+import TelegramBot from "node-telegram-bot-api";
 
-const prisma = new PrismaClient();
-const bot_tg = new TelegramBot(process.env.API_KEY_BOT as string, {
-  polling: { interval: 200 },
-});
-const logger = log4js.getLogger();
-logger.level = "info";
-
-interface PaymentRequestBody {
+type PaymentRequestBody = {
   label: string;
   unaccepted: boolean;
   operation_id: string;
-}
+};
 
-interface PaymentResponse {
+type PaymentResponse = {
   message: string;
-}
+};
+
+type TelegramErrorResponse = Error & {
+  response?: {
+    body?: {
+      description: string;
+      error_code?: number;
+      ok: boolean;
+    };
+  };
+};
+
+const prisma = new PrismaClient();
+const bot_tg = bot;
+const logger = log4js.getLogger();
+logger.level = "info";
 
 const sendSafeMessage = async (
   chatId: bigint,
   text: string,
   options?: TelegramBot.SendMessageOptions
-) => {
+): Promise<boolean> => {
   try {
     await bot_tg.sendMessage(chatId.toString(), text, options);
     return true;
   } catch (error) {
-    logger.error(`Failed to send message to ${chatId}: ${error}`);
+    const err = error as TelegramErrorResponse;
+    const errorMsg = err.response?.body?.description || "Unknown error";
+
+    if (errorMsg.includes("bot was blocked")) {
+      logger.warn(`User ${chatId} blocked the bot. Deleting user from DB.`);
+      await prisma.user.delete({ where: { tgId: chatId } });
+    } else if (errorMsg.includes("Too Many Requests")) {
+      logger.warn(`Too many requests to Telegram API. Retrying in 3s...`);
+      setTimeout(() => sendSafeMessage(chatId, text, options), 3000);
+    }
+    logger.error(`Failed to send message to ${chatId}: ${errorMsg}`);
     return false;
   }
-};
-
-// Вспомогательная функция для обработки ошибок БД
-const handleDatabaseError = (error: Error, message: string) => {
-  logger.error(`${message}: ${error.message}`);
-  throw new Error(message);
 };
 
 export const validatePayment = expressAsyncHandler(
@@ -50,138 +63,80 @@ export const validatePayment = expressAsyncHandler(
         `Processing payment: ${label}, status: ${unaccepted}, operation ID: ${operation_id}`
       );
 
-      // Если платеж заморожен (не принят)
+      const existingPayment = await prisma.payment.findUnique({
+        where: { order_id: label },
+        select: { status: true, processedAt: true, userId: true },
+      });
+
+      if (!existingPayment) {
+        logger.error(`Payment ${label} not found`);
+        res.status(404).json({ message: "Payment not found" });
+        return;
+      }
+
+      if (existingPayment.status === "SUCCESS" || existingPayment.processedAt) {
+        logger.warn(`Payment ${label} already processed.`);
+        res.status(200).json({ message: "Payment already processed" });
+        return;
+      }
+
       if (unaccepted) {
-        const payment = await prisma.payment
-          .findUnique({
-            where: { order_id: label },
-            select: { userId: true },
-          })
-          .catch((error) =>
-            handleDatabaseError(error, "Payment lookup failed")
+        const user = await prisma.user.findUnique({
+          where: { id: existingPayment.userId },
+          select: { tgId: true },
+        });
+
+        if (user) {
+          await sendSafeMessage(
+            user.tgId,
+            `❄️ Ваш платёж заморожен. Деньги не зачислены.\nНомер операции: ${operation_id}\nЕсли проблема не решится, напишите в поддержку: @GMTUSDT`
           );
-
-        if (!payment) {
-          logger.error(`Payment ${label} not found`);
-          res.status(404).json({ message: "Payment not found" });
-          return;
         }
-
-        const user = await prisma.user
-          .findUnique({
-            where: { id: payment.userId },
-            select: { tgId: true },
-          })
-          .catch((error) => handleDatabaseError(error, "User lookup failed"));
-
-        if (!user) {
-          logger.error(`User ${payment.userId} not found`);
-          res.status(404).json({ message: "User not found" });
-          return;
-        }
-
-        await sendSafeMessage(
-          user.tgId,
-          `❄️ Ваш платеж был заморожен. Деньги не были зачислены на счет.\nОбычно это решается в течении часа.\nНомер операции: ${operation_id}\n\nЕсли проблема не решится, напишите сюда: @GMTUSDT`
-        );
-
         res.status(200).json({ message: "Payment frozen message sent" });
         return;
       }
 
-      // Если платеж успешен
-      const payment = await prisma
-        .$transaction(async (tx) => {
-          const existingPayment = await tx.payment.findUnique({
-            where: { order_id: label },
-            select: { status: true },
-          });
-
-          if (existingPayment?.status) {
-            throw new Error("Payment already processed");
-          }
-
-          return tx.payment.update({
-            where: { order_id: label },
-            data: { status: true },
-            select: { userId: true },
-          });
-        })
-        .catch((error) => {
-          if (error.message === "Payment already processed") {
-            res.status(200).json({ message: "Payment already processed" });
-          } else {
-            handleDatabaseError(error, "Payment update failed");
-          }
-          return null;
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.payment.update({
+          where: { order_id: label },
+          data: { status: "SUCCESS", processedAt: new Date() },
         });
 
-      if (!payment) return;
+        await tx.userStatistics.upsert({
+          where: { userId: existingPayment.userId },
+          update: { coursePaid: true },
+          create: { userId: existingPayment.userId, coursePaid: true },
+        });
+      });
 
-      // Получение информации о пользователе
-      const user = await prisma.user
-        .findUnique({
-          where: { id: payment.userId },
-          select: { tgId: true, userName: true },
-        })
-        .catch((error) => handleDatabaseError(error, "User lookup failed"));
+      const user = await prisma.user.findUnique({
+        where: { id: existingPayment.userId },
+        select: { tgId: true, userName: true },
+      });
 
-      if (!user) {
-        logger.error(`User ${payment.userId} not found`);
-        res.status(404).json({ message: "User not found" });
-        return;
+      if (user) {
+        let inviteLink: string;
+        try {
+          inviteLink = await bot_tg.exportChatInviteLink(
+            process.env.CHANNEL_ID as string
+          );
+        } catch (error) {
+          logger.error("❌ Ошибка получения ссылки на канал:", error);
+          inviteLink = "";
+        }
+
+        // Отправляем пользователю приглашение
+        await sendSafeMessage(
+          user.tgId,
+          `🎉 Ваш платёж обработан! Доступ к курсу предоставлен.\n\nПрисоединяйтесь к каналу: [Нажмите сюда](${inviteLink})`,
+          { parse_mode: "Markdown" }
+        );
       }
 
-      // Обновление статистики
-      await prisma
-        .$transaction([
-          prisma.userStatistics.upsert({
-            where: { userId: payment.userId },
-            update: { coursePaid: true },
-            create: {
-              userId: payment.userId,
-              coursePaid: true,
-            },
-          }),
-        ])
-        .catch((error) =>
-          handleDatabaseError(error, "Statistics update failed")
-        );
-
-      // Отправка успешного сообщения пользователю с готовой ссылкой
-      const successMessage = `🎉 Ваш платеж был успешно обработан! Вы можете перейти по следующей ссылке для доступа к курсу: [Вставьте ссылку сюда]`;
-
-      await sendSafeMessage(user.tgId, successMessage);
-
-      logger.info(`Payment ${label} processed successfully`);
+      logger.info(`Payment ${label} successfully processed.`);
       res.status(200).json({ message: "Payment processed successfully" });
     } catch (error) {
       logger.error(`Critical error processing payment ${label}: ${error}`);
-
-      // Попытка уведомить пользователя об ошибке
-      try {
-        const failedPayment = await prisma.payment.findUnique({
-          where: { order_id: label },
-          select: { userId: true },
-        });
-
-        if (failedPayment) {
-          const user = await prisma.user.findUnique({
-            where: { id: failedPayment.userId },
-            select: { tgId: true },
-          });
-
-          if (user) {
-            await sendSafeMessage(
-              user.tgId,
-              `⚠️ Вы успешно оплатили заказ, но возникла техническая ошибка.\nКод операции: ${operation_id}\nПожалуйста, свяжитесь с поддержкой: @GMTUSDT`
-            );
-          }
-        }
-      } catch (innerError) {
-        logger.error(`Error notification failed: ${innerError}`);
-      }
-
       res.status(500).json({ message: "Internal server error" });
     }
   }

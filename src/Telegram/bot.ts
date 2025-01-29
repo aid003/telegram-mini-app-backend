@@ -16,7 +16,9 @@ const config: BotConfig = {
   welcomeImagePath: path.resolve("./public/main.jpg"),
 };
 
-const bot = new TelegramBot(config.token, { polling: { interval: 200 } });
+export const bot = new TelegramBot(config.token, {
+  polling: { interval: 200 },
+});
 const prisma = new PrismaClient();
 const logger = log4js.getLogger();
 logger.level = "info";

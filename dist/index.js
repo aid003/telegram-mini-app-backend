@@ -12,6 +12,7 @@ const cors_1 = __importDefault(require("cors"));
 const userController_1 = require("./Controller/UserController/userController");
 const statisticController_1 = require("./Controller/StatisticController/statisticController");
 const bot_1 = require("./Telegram/bot");
+const paymentHandler_1 = require("./PaymentHandler/paymentHandler");
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
 const logger = log4js_1.default.getLogger();
@@ -24,6 +25,7 @@ async function main() {
     app.use("/api/user-controller/", userController_1.userController);
     app.use("/api/update-user-statictics/", statisticController_1.updateUserStatistics);
     app.use("/api/generate-payment-process/", generatePaymentProcess_1.generatePaymentProcess);
+    app.use("/api/endpoint-for-validate-payment/", paymentHandler_1.validatePayment);
     await (0, bot_1.startTelegramBot)();
     app.listen(process.env.PORT, () => {
         logger.info(`🚀 Server with telegram bot running on port ${process.env.PORT}`);

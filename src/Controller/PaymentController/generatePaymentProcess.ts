@@ -24,6 +24,12 @@ export const generatePaymentProcess = expressAsyncHandler(
       return;
     }
 
+    if (!Number.isInteger(amount)) {
+      logger.warn(`Invalid amount: ${amount} is not an integer`);
+      res.status(400).json({ message: "Amount must be an integer" });
+      return;
+    }
+
     try {
       const user = await prisma.user.findUnique({
         where: { id },
@@ -51,7 +57,7 @@ export const generatePaymentProcess = expressAsyncHandler(
         data: {
           userId: id,
           order_id: orderId,
-          amount: amount,
+          amount: Math.floor(amount),
         },
       });
 
