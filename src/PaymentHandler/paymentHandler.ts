@@ -115,20 +115,26 @@ export const validatePayment = expressAsyncHandler(
       });
 
       if (user) {
-        let inviteLink: string;
+        let inviteLink: TelegramBot.ChatInviteLink;
         try {
-          inviteLink = await bot_tg.exportChatInviteLink(
-            process.env.CHANNEL_ID as string
+          inviteLink = await bot_tg.createChatInviteLink(
+            process.env.CHANNEL_ID as string,
+            { member_limit: 1 }
           );
         } catch (error) {
           logger.error("❌ Ошибка получения ссылки на канал:", error);
-          inviteLink = "";
+          inviteLink = {
+            invite_link: "",
+            creator: {} as TelegramBot.User,
+            is_primary: false,
+            is_revoked: false,
+          };
         }
 
         // Отправляем пользователю приглашение
         await sendSafeMessage(
           user.tgId,
-          `🎉 Ваш платёж обработан! Доступ к курсу предоставлен.\n\nПрисоединяйтесь к каналу: [Нажмите сюда](${inviteLink})`,
+          `🎉 Ваш платёж обработан! Доступ к курсу предоставлен.\n\nПрисоединяйтесь к каналу: [Нажмите сюда](${inviteLink.invite_link})`,
           { parse_mode: "Markdown" }
         );
       }
