@@ -1,10 +1,23 @@
 {
   "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
     "esModuleInterop": true,
-    "outDir": "dist",
+    "moduleResolution": "Node",
     "baseUrl": ".",
     "sourceMap": true,
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
-  }
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/**/*.ts", 
+    "src/Controller/**/*.ts" 
+  ],
+  "exclude": ["node_modules", "dist"]
 }

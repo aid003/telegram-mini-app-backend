@@ -3,19 +3,40 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var express_1 = __importDefault(require("express"));
-var dotenv_1 = __importDefault(require("dotenv"));
-var log4js_1 = __importDefault(require("log4js"));
+const generatePaymentProcess_1 = require("./Controller/PaymentController/generatePaymentProcess");
+const client_1 = require("@prisma/client");
+const express_1 = __importDefault(require("express"));
+const dotenv_1 = __importDefault(require("dotenv"));
+const log4js_1 = __importDefault(require("log4js"));
+const cors_1 = __importDefault(require("cors"));
+const userController_1 = require("./Controller/UserController/userController");
+const statisticController_1 = require("./Controller/StatisticController/statisticController");
+const bot_1 = require("./Telegram/bot");
+const paymentHandler_1 = require("./PaymentHandler/paymentHandler");
 dotenv_1.default.config();
-var logger = log4js_1.default.getLogger();
-logger.level = process.env.LOG_LEVEL;
-// logger.info("log4js log info");
-// logger.debug("log4js log debug");
-// logger.error("log4js log error");
-var app = (0, express_1.default)();
-var port = process.env.PORT;
-app.get("/", function (request, response) {
-    response.send("Hello world!");
+const prisma = new client_1.PrismaClient();
+const logger = log4js_1.default.getLogger();
+logger.level = "info";
+const app = (0, express_1.default)();
+async function main() {
+    app.use(express_1.default.json());
+    app.use((0, cors_1.default)({
+        origin: "*",
+        methods: ["POST", "GET"],
+    }));
+    app.use(express_1.default.urlencoded({ extended: true }));
+    app.use("/api/user-controller/", userController_1.userController);
+    app.use("/api/update-user-statictics/", statisticController_1.updateUserStatistics);
+    app.use("/api/generate-payment-process/", generatePaymentProcess_1.generatePaymentProcess);
+    app.use("/api/endpoint-for-validate-payment/", paymentHandler_1.validatePayment);
+    await (0, bot_1.startTelegramBot)();
+    app.listen(process.env.PORT, () => {
+        logger.info(`🚀 Server with telegram bot running on port ${process.env.PORT}`);
+    });
+}
+main().catch((e) => {
+    logger.error("ERROR: Произошла ошибка в main()", e);
+    prisma.$disconnect();
+    process.exit(1);
 });
-app.listen(port, function () { return console.log("Running on port ".concat(port)); });
 //# sourceMappingURL=index.js.map
