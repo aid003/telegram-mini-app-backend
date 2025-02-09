@@ -127,13 +127,45 @@ export async function startTelegramBot() {
           prisma.userStatistics.count({ where: { coursePaid: true } }),
         ]);
 
+        const totalUsers = botLaunchCount || 1; // Защита от деления на 0
+        const miniAppConversion = (
+          (miniAppLinkClickedCount / totalUsers) *
+          100
+        ).toFixed(2);
+        const learnMoreConversion = (
+          (learnMoreButtonClickedCount / miniAppLinkClickedCount) *
+          100
+        ).toFixed(2);
+        const courseButtonConversion = (
+          (courseButtonClickedCount / learnMoreButtonClickedCount) *
+          100
+        ).toFixed(2);
+        const coursePaidConversion = (
+          (coursePaidCount / courseButtonClickedCount) *
+          100
+        ).toFixed(2);
+
+        // Дополнительная глобальная конверсия (от общего числа запустивших бота)
+        const learnMoreGlobalConversion = (
+          (learnMoreButtonClickedCount / totalUsers) *
+          100
+        ).toFixed(2);
+        const courseButtonGlobalConversion = (
+          (courseButtonClickedCount / totalUsers) *
+          100
+        ).toFixed(2);
+        const coursePaidGlobalConversion = (
+          (coursePaidCount / totalUsers) *
+          100
+        ).toFixed(2);
+
         const statisticsMessage =
-          `*📊 Статистика использования бота*\\n\\n` +
-          `🚀 Запустили бота: ${botLaunchCount}\\n` +
-          `🔗 Переход по ссылке из бота в Mini App: ${miniAppLinkClickedCount}\\n` +
-          `❓ Нажали кнопку "Узнать больше": ${learnMoreButtonClickedCount}\\n` +
-          `💳 Нажали кнопку "Купить курс": ${courseButtonClickedCount}\\n` +
-          `✅ Оплатили курс: ${coursePaidCount}`;
+          `📊 *Статистика воронки продаж* 📊\n\n` +
+          `🚀 *Запустили бота:* ${botLaunchCount}\n` +
+          `🔗 *Перешли в Mini App:* ${miniAppLinkClickedCount} (${miniAppConversion}%)\n` +
+          `❓ *Нажали "Узнать больше":* ${learnMoreButtonClickedCount} (${learnMoreConversion}% | от начального: ${learnMoreGlobalConversion}%)\n` +
+          `💳 *Нажали "Купить курс":* ${courseButtonClickedCount} (${courseButtonConversion}% | от начального: ${courseButtonGlobalConversion}%)\n` +
+          `✅ *Оплатили курс:* ${coursePaidCount} (${coursePaidConversion}% | от начального: ${coursePaidGlobalConversion}%)`;
 
         await bot.sendMessage(chatId, statisticsMessage, {
           parse_mode: "Markdown",
