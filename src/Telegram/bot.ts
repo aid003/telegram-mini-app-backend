@@ -93,12 +93,111 @@ export async function startTelegramBot() {
           },
         });
 
-      logger.info(
-        `Приветственное сообщение отправлено пользователю: ${userName}`
-      );
-    } catch (error) {
-      logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
-      await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
+        logger.info(
+          `📩 Приветственное сообщение отправлено пользователю: ${userName}`
+        );
+      } catch (error) {
+        logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
+        await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
+      }
+    }
+
+    if (text === "/statistic") {
+      const allowedTgIds = [2099914999, 7311013323];
+
+      if (!allowedTgIds.includes(Number(tgId))) {
+        logger.warn(`⛔ Пользователь ${tgId} пытался запросить статистику`);
+        return bot.sendMessage(chatId, "У вас нет доступа к этой команде.");
+      }
+
+      try {
+        const [
+          botLaunchCount,
+          miniAppLinkClickedCount,
+          learnMoreButtonClickedCount,
+          courseButtonClickedCount,
+          coursePaidCount,
+        ] = await Promise.all([
+          prisma.userStatistics.count({ where: { botLaunch: true } }),
+          prisma.userStatistics.count({ where: { miniAppLinkClicked: true } }),
+          prisma.userStatistics.count({
+            where: { learnMoreButtonClicked: true },
+          }),
+          prisma.userStatistics.count({ where: { courseButtonClicked: true } }),
+          prisma.userStatistics.count({ where: { coursePaid: true } }),
+        ]);
+
+        const totalUsers = botLaunchCount || 1; // Защита от деления на 0
+        const miniAppConversion = (
+          (miniAppLinkClickedCount / totalUsers) *
+          100
+        ).toFixed(2);
+        const learnMoreConversion = (
+          (learnMoreButtonClickedCount / miniAppLinkClickedCount) *
+          100
+        ).toFixed(2);
+        const courseButtonConversion = (
+          (courseButtonClickedCount / learnMoreButtonClickedCount) *
+          100
+        ).toFixed(2);
+        const coursePaidConversion = (
+          (coursePaidCount / courseButtonClickedCount) *
+          100
+        ).toFixed(2);
+
+        const learnMoreGlobalConversion = (
+          (learnMoreButtonClickedCount / totalUsers) *
+          100
+        ).toFixed(2);
+        const courseButtonGlobalConversion = (
+          (courseButtonClickedCount / totalUsers) *
+          100
+        ).toFixed(2);
+        const coursePaidGlobalConversion = (
+          (coursePaidCount / totalUsers) *
+          100
+        ).toFixed(2);
+
+        const statisticsMessage =
+          `📊 *Статистика воронки продаж* 📊\n\n` +
+          `🚀 *Запустили бота:* ${botLaunchCount}\n` +
+          `🔗 *Перешли в Mini App:* ${miniAppLinkClickedCount} (${miniAppConversion}%)\n` +
+          `❓ *Нажали "Узнать больше":* ${learnMoreButtonClickedCount} (${learnMoreConversion}% | от начального: ${learnMoreGlobalConversion}%)\n` +
+          `💳 *Нажали "Купить курс":* ${courseButtonClickedCount} (${courseButtonConversion}% | от начального: ${courseButtonGlobalConversion}%)\n` +
+          `✅ *Оплатили курс:* ${coursePaidCount} (${coursePaidConversion}% | от начального: ${coursePaidGlobalConversion}%)`;
+
+        await bot.sendMessage(chatId, statisticsMessage, {
+          parse_mode: "Markdown",
+        });
+
+        logger.info(`📊 Статистика отправлена пользователю с tgId: ${tgId}`);
+      } catch (error) {
+        logger.error(
+          `Ошибка при обработке команды /statistic у ${tgId}:`,
+          error
+        );
+        await bot.sendMessage(
+          chatId,
+          "Произошла ошибка при получении статистики. Попробуйте снова."
+        );
+      }
     }
   });
+
+  bot.on("callback_query", async (query) => {
+    const chatId = query.message?.chat.id;
+    const data = query.data;
+
+    if (!chatId || !data) return;
+
+    logger.info(`🔘 Получен callback_query: ${data}`);
+
+    if (data === "some_action") {
+      await bot.sendMessage(chatId, "Вы нажали кнопку!");
+    }
+
+    await bot.answerCallbackQuery(query.id);
+  });
+
+  logger.info("✅ Бот успешно запущен и слушает сообщения.");
 }
