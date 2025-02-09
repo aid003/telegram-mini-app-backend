@@ -30,6 +30,9 @@ async function main() {
     app.use("/api/generate-payment-process/", generatePaymentProcess_1.generatePaymentProcess);
     app.use("/api/endpoint-for-validate-payment/", paymentHandler_1.validatePayment);
     await (0, bot_1.startTelegramBot)();
+    app.get("/", (req, res) => {
+        res.send("working...");
+    });
     app.listen(process.env.PORT, () => {
         logger.info(`🚀 Server with telegram bot running on port ${process.env.PORT}`);
     });

@@ -18,11 +18,6 @@ model User {
   applications Application[]
 }
 
-enum PaymentStatus {
-  PENDING
-  SUCCESS
-  FAILED
-}
 
 model Payment {
   id          Int      @id @default(autoincrement())
@@ -30,7 +25,7 @@ model Payment {
   amount      Int
   status      String   @default("PENDING") // "PENDING", "SUCCESS", "FAILED"
   createdAt   DateTime @default(now())
-  processedAt DateTime? // Новый столбец, предотвращающий повторную обработку
+  processedAt DateTime?
   user        User     @relation(fields: [userId], references: [id])
   userId      Int
 }

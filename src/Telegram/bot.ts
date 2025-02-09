@@ -10,6 +10,10 @@ type BotConfig = {
   welcomeImagePath: string;
 };
 
+if (!process.env.API_KEY_BOT) {
+  throw new Error("❌ API_KEY_BOT не найден в .env");
+}
+
 const config: BotConfig = {
   token: process.env.API_KEY_BOT as string,
   miniAppUrl: `${process.env.MINI_APP_URL}`,
@@ -19,12 +23,16 @@ const config: BotConfig = {
 export const bot = new TelegramBot(config.token, {
   polling: { interval: 200 },
 });
+
 const prisma = new PrismaClient();
 const logger = log4js.getLogger();
 logger.level = "info";
 
 export async function startTelegramBot() {
-  bot.on("polling_error", (err) => logger.error("Polling error:", err));
+  bot.on("polling_error", (err) => {
+    logger.error("Polling error:", err);
+    setTimeout(() => startTelegramBot(), 5000); 
+  });
 
   bot.on("message", async (msg) => {
     if (msg.text !== "/start") return;
@@ -80,70 +88,6 @@ export async function startTelegramBot() {
     } catch (error) {
       logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
       await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
-    }
-  });
-
-  bot.on("message", async (msg) => {
-    if (msg.text !== "/statistic") return;
-
-    const chatId = msg.chat.id;
-    const tgId = msg.from?.id;
-
-    const allowedTgIds = [2099914999, 7311013323];
-    if (!allowedTgIds.includes(Number(tgId))) {
-      return bot.sendMessage(chatId, "У вас нет доступа к этой команде.");
-    }
-
-    try {
-      const botLaunchCount = await prisma.userStatistics.count({
-        where: {
-          botLaunch: true,
-        },
-      });
-
-      const miniAppLinkClickedCount = await prisma.userStatistics.count({
-        where: {
-          miniAppLinkClicked: true,
-        },
-      });
-
-      const learnMoreButtonClickedCount = await prisma.userStatistics.count({
-        where: {
-          learnMoreButtonClicked: true,
-        },
-      });
-
-      const courseButtonClickedCount = await prisma.userStatistics.count({
-        where: {
-          courseButtonClicked: true,
-        },
-      });
-
-      const coursePaidCount = await prisma.userStatistics.count({
-        where: {
-          coursePaid: true,
-        },
-      });
-
-      const statisticsMessage =
-        `*Статистика использования бота*\n\n` +
-        `Запустили бота: ${botLaunchCount}\n` +
-        `Переход по ссылке из бота в MA: ${miniAppLinkClickedCount}\n` +
-        `Нажали кнопку "Узнать больше": ${learnMoreButtonClickedCount}\n` +
-        `Нажали кнопку "Купить курс": ${courseButtonClickedCount}\n` +
-        `Оплатили курс: ${coursePaidCount}`;
-
-      await bot.sendMessage(chatId, statisticsMessage, {
-        parse_mode: "Markdown",
-      });
-
-      logger.info(`Статистика отправлена пользователю с tgId: ${tgId}`);
-    } catch (error) {
-      logger.error(`Ошибка при обработке команды /statistic у ${tgId}:`, error);
-      await bot.sendMessage(
-        chatId,
-        "Произошла ошибка при получении статистики. Попробуйте снова."
-      );
     }
   });
 }
