@@ -162,9 +162,9 @@ export async function startTelegramBot() {
           `📊 *Статистика воронки продаж* 📊\n\n` +
           `🚀 *Запустили бота:* ${botLaunchCount}\n` +
           `🔗 *Перешли в Mini App:* ${miniAppLinkClickedCount} (${miniAppConversion}%)\n` +
-          `❓ *Нажали "Узнать больше":* ${learnMoreButtonClickedCount} (${learnMoreConversion}% | от начального: ${learnMoreGlobalConversion}%)\n` +
-          `💳 *Нажали "Купить курс":* ${courseButtonClickedCount} (${courseButtonConversion}% | от начального: ${courseButtonGlobalConversion}%)\n` +
-          `✅ *Оплатили курс:* ${coursePaidCount} (${coursePaidConversion}% | от начального: ${coursePaidGlobalConversion}%)`;
+          `❓ *Нажали "Узнать больше":* ${learnMoreButtonClickedCount} (${learnMoreConversion}% | ${learnMoreGlobalConversion}%)\n` +
+          `💳 *Нажали "Купить курс":* ${courseButtonClickedCount} (${courseButtonConversion}% | ${courseButtonGlobalConversion}%)\n` +
+          `✅ *Оплатили курс:* ${coursePaidCount} (${coursePaidConversion}% | ${coursePaidGlobalConversion}%)`;
 
         await bot.sendMessage(chatId, statisticsMessage, {
           parse_mode: "Markdown",
