@@ -145,7 +145,6 @@ export async function startTelegramBot() {
           100
         ).toFixed(2);
 
-        // Дополнительная глобальная конверсия (от общего числа запустивших бота)
         const learnMoreGlobalConversion = (
           (learnMoreButtonClickedCount / totalUsers) *
           100
