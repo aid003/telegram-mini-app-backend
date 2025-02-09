@@ -31,63 +31,142 @@ logger.level = "info";
 export async function startTelegramBot() {
   bot.on("polling_error", (err) => {
     logger.error("Polling error:", err);
-    setTimeout(() => startTelegramBot(), 5000); 
+    setTimeout(() => startTelegramBot(), 5000);
   });
 
   bot.on("message", async (msg) => {
-    if (msg.text !== "/start") return;
-
     const chatId = msg.chat.id;
     const tgId = msg.from?.id;
-    const userName = msg.from?.username;
-    const firstName = msg.from?.first_name;
+    const text = msg.text?.trim() || "";
 
-    if (!tgId || !userName || !firstName) {
-      logger.warn(`Missing user data for chatId: ${chatId}`);
-      return bot.sendMessage(chatId, "Ошибка получения данных пользователя.");
+    if (!tgId) {
+      logger.warn("Сообщение получено без tgId");
+      return bot.sendMessage(
+        chatId,
+        "Ошибка: не удалось определить ваш Telegram ID."
+      );
     }
 
-    try {
-      let user = await prisma.user.findUnique({ where: { tgId } });
+    if (text === "/start") {
+      const userName = msg.from?.username;
+      const firstName = msg.from?.first_name;
 
-      if (!user) {
-        user = await prisma.user.create({
-          data: { tgId, userName, firstName },
-        });
-        logger.info(
-          `Новый пользователь зарегистрирован: ${userName} (tgId: ${tgId})`
-        );
-      } else {
-        logger.info(`Пользователь авторизован: ${userName} (tgId: ${tgId})`);
+      if (!userName || !firstName) {
+        logger.warn(`Не удалось получить имя пользователя. ChatId: ${chatId}`);
+        return bot.sendMessage(chatId, "Ошибка получения данных пользователя.");
       }
 
-      await prisma.userStatistics.upsert({
-        where: { userId: user.id },
-        update: { botLaunch: true },
-        create: { userId: user.id, botLaunch: true },
-      });
+      try {
+        let user = await prisma.user.findUnique({ where: { tgId } });
 
-      await bot.sendPhoto(chatId, config.welcomeImagePath, {
-        caption,
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "🔥 Открыть Mini App",
-                web_app: { url: config.miniAppUrl },
-              },
+        if (!user) {
+          user = await prisma.user.create({
+            data: { tgId, userName, firstName },
+          });
+          logger.info(
+            `🆕 Новый пользователь зарегистрирован: ${userName} (tgId: ${tgId})`
+          );
+        } else {
+          logger.info(
+            `✅ Пользователь авторизован: ${userName} (tgId: ${tgId})`
+          );
+        }
+
+        await prisma.userStatistics.upsert({
+          where: { userId: user.id },
+          update: { botLaunch: true },
+          create: { userId: user.id, botLaunch: true },
+        });
+
+        await bot.sendPhoto(chatId, config.welcomeImagePath, {
+          caption,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🔥 Открыть Mini App",
+                  web_app: { url: config.miniAppUrl },
+                },
+              ],
             ],
-          ],
-        },
-      });
+          },
+        });
 
-      logger.info(
-        `Приветственное сообщение отправлено пользователю: ${userName}`
-      );
-    } catch (error) {
-      logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
-      await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
+        logger.info(
+          `📩 Приветственное сообщение отправлено пользователю: ${userName}`
+        );
+      } catch (error) {
+        logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
+        await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
+      }
+    }
+
+    if (text === "/statistic") {
+      const allowedTgIds = [2099914999, 7311013323];
+
+      if (!allowedTgIds.includes(Number(tgId))) {
+        logger.warn(`⛔ Пользователь ${tgId} пытался запросить статистику`);
+        return bot.sendMessage(chatId, "У вас нет доступа к этой команде.");
+      }
+
+      try {
+        const [
+          botLaunchCount,
+          miniAppLinkClickedCount,
+          learnMoreButtonClickedCount,
+          courseButtonClickedCount,
+          coursePaidCount,
+        ] = await Promise.all([
+          prisma.userStatistics.count({ where: { botLaunch: true } }),
+          prisma.userStatistics.count({ where: { miniAppLinkClicked: true } }),
+          prisma.userStatistics.count({
+            where: { learnMoreButtonClicked: true },
+          }),
+          prisma.userStatistics.count({ where: { courseButtonClicked: true } }),
+          prisma.userStatistics.count({ where: { coursePaid: true } }),
+        ]);
+
+        const statisticsMessage =
+          `*📊 Статистика использования бота*\\n\\n` +
+          `🚀 Запустили бота: ${botLaunchCount}\\n` +
+          `🔗 Переход по ссылке из бота в Mini App: ${miniAppLinkClickedCount}\\n` +
+          `❓ Нажали кнопку "Узнать больше": ${learnMoreButtonClickedCount}\\n` +
+          `💳 Нажали кнопку "Купить курс": ${courseButtonClickedCount}\\n` +
+          `✅ Оплатили курс: ${coursePaidCount}`;
+
+        await bot.sendMessage(chatId, statisticsMessage, {
+          parse_mode: "Markdown",
+        });
+
+        logger.info(`📊 Статистика отправлена пользователю с tgId: ${tgId}`);
+      } catch (error) {
+        logger.error(
+          `Ошибка при обработке команды /statistic у ${tgId}:`,
+          error
+        );
+        await bot.sendMessage(
+          chatId,
+          "Произошла ошибка при получении статистики. Попробуйте снова."
+        );
+      }
     }
   });
+
+  bot.on("callback_query", async (query) => {
+    const chatId = query.message?.chat.id;
+    const data = query.data;
+
+    if (!chatId || !data) return;
+
+    logger.info(`🔘 Получен callback_query: ${data}`);
+
+    if (data === "some_action") {
+      await bot.sendMessage(chatId, "Вы нажали кнопку!");
+    }
+
+    await bot.answerCallbackQuery(query.id);
+  });
+
+  logger.info("✅ Бот успешно запущен и слушает сообщения.");
 }
