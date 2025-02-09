@@ -4,11 +4,20 @@ import expressAsyncHandler from "express-async-handler";
 import log4js from "log4js";
 import { Request, Response } from "express";
 import TelegramBot from "node-telegram-bot-api";
+import crypto from "crypto";
 
+// Расширяем тип входящих данных уведомления
 type PaymentRequestBody = {
-  label: string;
-  unaccepted: boolean;
+  notification_type: string;
   operation_id: string;
+  amount: string;
+  currency: string;
+  datetime: string;
+  sender: string;
+  codepro: string; // Обычно "false"
+  label: string;
+  sha1_hash: string;
+  unaccepted: string; // "true" или "false"
 };
 
 type PaymentResponse = {
@@ -29,6 +38,9 @@ const prisma = new PrismaClient();
 const bot_tg = bot;
 const logger = log4js.getLogger();
 logger.level = "info";
+
+// Секрет для проверки хеша, полученный из настроек HTTP-уведомлений
+const notificationSecret = "Fv5pZ52g3OD0N3tGQjKNZld8";
 
 const sendSafeMessage = async (
   chatId: bigint,
@@ -56,11 +68,44 @@ const sendSafeMessage = async (
 
 export const validatePayment = expressAsyncHandler(
   async (req: Request, res: Response<PaymentResponse>): Promise<void> => {
-    const { label, unaccepted, operation_id } = req.body as PaymentRequestBody;
+    // Убедитесь, что в приложении подключён middleware для urlencoded:
+    // app.use(express.urlencoded({ extended: true }));
+
+    const {
+      notification_type,
+      operation_id,
+      amount,
+      currency,
+      datetime,
+      sender,
+      codepro,
+      label,
+      sha1_hash,
+      unaccepted,
+    } = req.body as PaymentRequestBody;
+
+    // Шаг 1. Формируем строку для расчёта хеша согласно спецификации:
+    const dataString = `${notification_type}&${operation_id}&${amount}&${currency}&${datetime}&${sender}&${codepro}&${notificationSecret}&${label}`;
+    // Шаг 2 и 3. Вычисляем SHA‑1 хэш и получаем его HEX‑кодированное представление:
+    const calculatedHash = crypto
+      .createHash("sha1")
+      .update(dataString)
+      .digest("hex");
+
+    if (calculatedHash !== sha1_hash) {
+      logger.error(
+        `Hash validation failed for operation ${operation_id}. Calculated hash: ${calculatedHash}, received hash: ${sha1_hash}`
+      );
+      res.status(400).json({ message: "Hash validation failed" });
+      return;
+    }
+
+    // Корректное приведение поля unaccepted к булевому значению
+    const isUnaccepted = unaccepted === "true";
 
     try {
       logger.info(
-        `Processing payment: ${label}, status: ${unaccepted}, operation ID: ${operation_id}`
+        `Processing payment: ${label}, unaccepted: ${isUnaccepted}, operation ID: ${operation_id}`
       );
 
       const existingPayment = await prisma.payment.findUnique({
@@ -80,7 +125,7 @@ export const validatePayment = expressAsyncHandler(
         return;
       }
 
-      if (unaccepted) {
+      if (isUnaccepted) {
         const user = await prisma.user.findUnique({
           where: { id: existingPayment.userId },
           select: { tgId: true },
