@@ -93,80 +93,12 @@ export async function startTelegramBot() {
           },
         });
 
-        logger.info(
-          `📩 Приветственное сообщение отправлено пользователю: ${userName}`
-        );
-      } catch (error) {
-        logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
-        await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
-      }
-    }
-
-    if (text === "/statistic") {
-      const allowedTgIds = [2099914999, 7311013323];
-
-      if (!allowedTgIds.includes(Number(tgId))) {
-        logger.warn(`⛔ Пользователь ${tgId} пытался запросить статистику`);
-        return bot.sendMessage(chatId, "У вас нет доступа к этой команде.");
-      }
-
-      try {
-        const [
-          botLaunchCount,
-          miniAppLinkClickedCount,
-          learnMoreButtonClickedCount,
-          courseButtonClickedCount,
-          coursePaidCount,
-        ] = await Promise.all([
-          prisma.userStatistics.count({ where: { botLaunch: true } }),
-          prisma.userStatistics.count({ where: { miniAppLinkClicked: true } }),
-          prisma.userStatistics.count({
-            where: { learnMoreButtonClicked: true },
-          }),
-          prisma.userStatistics.count({ where: { courseButtonClicked: true } }),
-          prisma.userStatistics.count({ where: { coursePaid: true } }),
-        ]);
-
-        const statisticsMessage =
-          `*📊 Статистика использования бота*\\n\\n` +
-          `🚀 Запустили бота: ${botLaunchCount}\\n` +
-          `🔗 Переход по ссылке из бота в Mini App: ${miniAppLinkClickedCount}\\n` +
-          `❓ Нажали кнопку "Узнать больше": ${learnMoreButtonClickedCount}\\n` +
-          `💳 Нажали кнопку "Купить курс": ${courseButtonClickedCount}\\n` +
-          `✅ Оплатили курс: ${coursePaidCount}`;
-
-        await bot.sendMessage(chatId, statisticsMessage, {
-          parse_mode: "Markdown",
-        });
-
-        logger.info(`📊 Статистика отправлена пользователю с tgId: ${tgId}`);
-      } catch (error) {
-        logger.error(
-          `Ошибка при обработке команды /statistic у ${tgId}:`,
-          error
-        );
-        await bot.sendMessage(
-          chatId,
-          "Произошла ошибка при получении статистики. Попробуйте снова."
-        );
-      }
+      logger.info(
+        `Приветственное сообщение отправлено пользователю: ${userName}`
+      );
+    } catch (error) {
+      logger.error(`Ошибка при обработке команды /start у ${tgId}:`, error);
+      await bot.sendMessage(chatId, "Произошла ошибка, попробуйте снова.");
     }
   });
-
-  bot.on("callback_query", async (query) => {
-    const chatId = query.message?.chat.id;
-    const data = query.data;
-
-    if (!chatId || !data) return;
-
-    logger.info(`🔘 Получен callback_query: ${data}`);
-
-    if (data === "some_action") {
-      await bot.sendMessage(chatId, "Вы нажали кнопку!");
-    }
-
-    await bot.answerCallbackQuery(query.id);
-  });
-
-  logger.info("✅ Бот успешно запущен и слушает сообщения.");
 }
