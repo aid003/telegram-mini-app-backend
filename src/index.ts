@@ -11,10 +11,20 @@ import { validatePayment } from "./PaymentHandler/paymentHandler";
 
 dotenv.config();
 
-const prisma = new PrismaClient();
+log4js.configure({
+  appenders: {
+    console: { type: "console" },
+    file: { type: "file", filename: "app.log" },
+  },
+  categories: {
+    default: { appenders: ["console", "file"], level: "info" },
+  },
+});
 
 const logger = log4js.getLogger();
 logger.level = "info";
+
+const prisma = new PrismaClient();
 
 const app = express();
 
