@@ -8,10 +8,13 @@ const bot_1 = require("./../Telegram/bot");
 const client_1 = require("@prisma/client");
 const express_async_handler_1 = __importDefault(require("express-async-handler"));
 const log4js_1 = __importDefault(require("log4js"));
+const crypto_1 = __importDefault(require("crypto"));
 const prisma = new client_1.PrismaClient();
 const bot_tg = bot_1.bot;
 const logger = log4js_1.default.getLogger();
 logger.level = "info";
+// Секрет для проверки хеша, полученный из настроек HTTP-уведомлений
+const notificationSecret = "Fv5pZ52g3OD0N3tGQjKNZld8";
 const sendSafeMessage = async (chatId, text, options) => {
     try {
         await bot_tg.sendMessage(chatId.toString(), text, options);
@@ -33,9 +36,24 @@ const sendSafeMessage = async (chatId, text, options) => {
     }
 };
 exports.validatePayment = (0, express_async_handler_1.default)(async (req, res) => {
-    const { label, unaccepted, operation_id } = req.body;
+    const { notification_type, operation_id, amount, currency, datetime, sender, codepro, label, sha1_hash, unaccepted, } = req.body;
+    const dataString = `${notification_type}&${operation_id}&${amount}&${currency}&${datetime}&${sender}&${codepro}&${notificationSecret}&${label}`;
+    const calculatedHash = crypto_1.default
+        .createHash("sha1")
+        .update(dataString)
+        .digest("hex");
+    if (calculatedHash !== sha1_hash) {
+        logger.error(`Hash validation failed for operation ${operation_id}. Calculated hash: ${calculatedHash}, received hash: ${sha1_hash}`);
+        res.status(400).json({ message: "Hash validation failed" });
+        return;
+    }
+    const isUnaccepted = unaccepted === "true";
+    if (operation_id === "test-notification") {
+        logger.info("Получил тестовое уведомление!");
+        return;
+    }
     try {
-        logger.info(`Processing payment: ${label}, status: ${unaccepted}, operation ID: ${operation_id}`);
+        logger.info(`Processing payment: ${label}, unaccepted: ${isUnaccepted}, operation ID: ${operation_id}`);
         const existingPayment = await prisma.payment.findUnique({
             where: { order_id: label },
             select: { status: true, processedAt: true, userId: true },
@@ -50,7 +68,7 @@ exports.validatePayment = (0, express_async_handler_1.default)(async (req, res) 
             res.status(200).json({ message: "Payment already processed" });
             return;
         }
-        if (unaccepted) {
+        if (isUnaccepted) {
             const user = await prisma.user.findUnique({
                 where: { id: existingPayment.userId },
                 select: { tgId: true },
@@ -90,7 +108,6 @@ exports.validatePayment = (0, express_async_handler_1.default)(async (req, res) 
                     is_revoked: false,
                 };
             }
-            // Отправляем пользователю приглашение
             await sendSafeMessage(user.tgId, `🎉 Ваш платёж обработан! Доступ к курсу предоставлен.\n\nПрисоединяйтесь к каналу: [Нажмите сюда](${inviteLink.invite_link})`, { parse_mode: "Markdown" });
         }
         logger.info(`Payment ${label} successfully processed.`);

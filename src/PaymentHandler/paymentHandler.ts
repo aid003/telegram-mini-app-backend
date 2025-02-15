@@ -68,9 +68,6 @@ const sendSafeMessage = async (
 
 export const validatePayment = expressAsyncHandler(
   async (req: Request, res: Response<PaymentResponse>): Promise<void> => {
-    // Убедитесь, что в приложении подключён middleware для urlencoded:
-    // app.use(express.urlencoded({ extended: true }));
-
     const {
       notification_type,
       operation_id,
@@ -84,9 +81,7 @@ export const validatePayment = expressAsyncHandler(
       unaccepted,
     } = req.body as PaymentRequestBody;
 
-    // Шаг 1. Формируем строку для расчёта хеша согласно спецификации:
     const dataString = `${notification_type}&${operation_id}&${amount}&${currency}&${datetime}&${sender}&${codepro}&${notificationSecret}&${label}`;
-    // Шаг 2 и 3. Вычисляем SHA‑1 хэш и получаем его HEX‑кодированное представление:
     const calculatedHash = crypto
       .createHash("sha1")
       .update(dataString)
@@ -100,8 +95,12 @@ export const validatePayment = expressAsyncHandler(
       return;
     }
 
-    // Корректное приведение поля unaccepted к булевому значению
     const isUnaccepted = unaccepted === "true";
+
+    if (operation_id === "test-notification") {
+      logger.info("Получил тестовое уведомление!");
+      return;
+    }
 
     try {
       logger.info(
@@ -176,7 +175,6 @@ export const validatePayment = expressAsyncHandler(
           };
         }
 
-        // Отправляем пользователю приглашение
         await sendSafeMessage(
           user.tgId,
           `🎉 Ваш платёж обработан! Доступ к курсу предоставлен.\n\nПрисоединяйтесь к каналу: [Нажмите сюда](${inviteLink.invite_link})`,
