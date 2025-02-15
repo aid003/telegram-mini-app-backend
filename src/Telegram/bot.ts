@@ -21,7 +21,13 @@ const config: BotConfig = {
 };
 
 export const bot = new TelegramBot(config.token, {
-  polling: { interval: 200 },
+  polling: {
+    interval: 1000,
+    autoStart: true,
+    params: {
+      timeout: 30,
+    },
+  },
 });
 
 const prisma = new PrismaClient();
@@ -85,7 +91,7 @@ export async function startTelegramBot() {
             inline_keyboard: [
               [
                 {
-                  text: "🔥 Открыть Mini App",
+                  text: "Пройти тест",
                   web_app: { url: config.miniAppUrl },
                 },
               ],

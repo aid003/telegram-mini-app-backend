@@ -14,9 +14,18 @@ const statisticController_1 = require("./Controller/StatisticController/statisti
 const bot_1 = require("./Telegram/bot");
 const paymentHandler_1 = require("./PaymentHandler/paymentHandler");
 dotenv_1.default.config();
-const prisma = new client_1.PrismaClient();
+log4js_1.default.configure({
+    appenders: {
+        console: { type: "console" },
+        file: { type: "file", filename: "app.log" },
+    },
+    categories: {
+        default: { appenders: ["console", "file"], level: "info" },
+    },
+});
 const logger = log4js_1.default.getLogger();
 logger.level = "info";
+const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
 async function main() {
     app.use(express_1.default.json());
